@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KI-gestütztes IR-Framework | Christoph Ottiger</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    background: #f5f5f3;
+    color: #222;
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+
+  .container { max-width: 960px; margin: 0 auto; }
+
+  /* HEADER */
+  .header { margin-bottom: 2rem; }
+  .header h1 { font-size: 20px; font-weight: 600; color: #1F4E79; margin-bottom: 4px; }
+  .header p { font-size: 13px; color: #888; font-style: italic; }
+
+  /* TOP NAV TABS */
+  .tabs { display: flex; gap: 6px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .tab {
+    font-size: 12px; padding: 5px 14px; border: 1px solid #ccc;
+    border-radius: 20px; cursor: pointer; background: #fff; color: #666;
+    transition: all 0.15s;
+  }
+  .tab:hover { border-color: #888; color: #333; }
+  .tab.active { background: #1F4E79; color: #fff; border-color: #1F4E79; }
+
+  /* SECTION */
+  .section { display: none; }
+  .section.visible { display: block; }
+
+  /* PHASE GRID */
+  .phase-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  @media (max-width: 640px) {
+    .phase-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .phase-btn {
+    border: 1.5px solid #ccc;
+    border-radius: 10px;
+    padding: 12px 10px;
+    cursor: pointer;
+    background: #fff;
+    text-align: center;
+    transition: box-shadow 0.15s, transform 0.1s;
+  }
+  .phase-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); transform: translateY(-1px); }
+  .phase-btn .pnum { font-size: 10px; font-weight: 600; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .phase-btn .ptitle { font-size: 13px; font-weight: 600; color: #111; margin-bottom: 3px; }
+  .phase-btn .psub { font-size: 11px; color: #888; }
+
+  .p1 { border-color: #0F6E56; } .p1 .pnum { color: #0F6E56; }
+  .p2 { border-color: #185FA5; } .p2 .pnum { color: #185FA5; }
+  .p3 { border-color: #854F0B; } .p3 .pnum { color: #854F0B; }
+  .p4 { border-color: #534AB7; } .p4 .pnum { color: #534AB7; }
+
+  .p1.active { background: #E1F5EE; }
+  .p2.active { background: #E6F1FB; }
+  .p3.active { background: #FAEEDA; }
+  .p4.active { background: #EEEDFE; }
+
+  /* DETAIL PANEL */
+  .detail {
+    display: none;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .detail.visible { display: block; }
+
+  .detail-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 12px; border-radius: 20px; }
+  .detail-title { font-size: 15px; font-weight: 600; color: #111; }
+
+  .row-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  @media (max-width: 640px) {
+    .row-grid { grid-template-columns: 1fr; }
+  }
+
+  .row-card {
+    background: #f8f8f6;
+    border: 1px solid #e8e8e4;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .row-card .rlabel {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: #999; margin-bottom: 7px;
+  }
+  .row-card ul { padding-left: 1.1rem; }
+  .row-card ul li { font-size: 12px; color: #555; line-height: 1.55; margin-bottom: 3px; }
+
+  .tag {
+    display: inline-block; font-size: 11px; padding: 2px 9px;
+    border-radius: 10px; margin: 2px 2px 0 0;
+    background: #fff; border: 1px solid #ddd; color: #666;
+  }
+
+  .stop-box {
+    background: #fff8f7;
+    border-left: 3px solid #E24B4A;
+    border-radius: 0;
+    padding: 9px 12px;
+    font-size: 12px;
+    color: #b03030;
+    margin-bottom: 10px;
+  }
+
+  .output-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid #eee; }
+  .output-lbl { font-size: 11px; color: #999; }
+  .obadge { font-size: 11px; padding: 3px 10px; border-radius: 10px; font-weight: 500; }
+
+  /* BASE INFRA */
+  .infra-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  @media (max-width: 500px) { .infra-grid { grid-template-columns: 1fr; } }
+  .infra-card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px 14px; }
+  .infra-card .ic-title { font-size: 13px; font-weight: 600; color: #111; margin-bottom: 3px; }
+  .infra-card .ic-sub { font-size: 12px; color: #777; line-height: 1.5; }
+
+  /* SECTION DIVIDER */
+  .sec-div { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #bbb; margin: 16px 0 6px; }
+
+  /* DASHBOARD / MATRIX */
+  .card { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+  .card-label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #999; margin-bottom: 12px; }
+
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+  @media (max-width: 560px) { .metrics { grid-template-columns: repeat(2,1fr); } }
+  .metric { background: #f5f5f3; border-radius: 8px; padding: 12px; text-align: center; }
+  .metric .val { font-size: 20px; font-weight: 600; display: block; }
+  .metric .lbl { font-size: 11px; color: #888; margin-top: 3px; line-height: 1.3; }
+
+  .pipeline { display: flex; margin-bottom: 4px; }
+  .pipe-step { flex: 1; text-align: center; padding: 8px 4px; border: 1px solid #ddd; font-size: 11px; position: relative; background: #fff; }
+  .pipe-step:not(:last-child)::after { content: "›"; position: absolute; right: -8px; top: 50%; transform: translateY(-50%); z-index: 1; font-size: 16px; color: #aaa; }
+  .pipe-step .pn { font-size: 18px; font-weight: 600; }
+  .pipe-step .pl { font-size: 10px; color: #888; margin-top: 2px; }
+  .pipe-step:first-child { border-radius: 8px 0 0 8px; background: #E1F5EE; }
+  .pipe-step:last-child { border-radius: 0 8px 8px 0; background: #E1F5EE; }
+
+  /* MATRIX */
+  .matrix-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .matrix-table th { text-align: left; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #ddd; color: #555; font-size: 12px; }
+  .matrix-table td { padding: 8px 10px; border-bottom: 1px solid #eee; vertical-align: middle; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .dot-p { background: #E24B4A; } .dot-h { background: #BA7517; } .dot-a { background: #1D9E75; }
+  .legend { display: flex; gap: 20px; font-size: 12px; color: #777; margin-top: 12px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+
+  /* PORTAL */
+  .portal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 8px; }
+  .portal-logo { font-size: 15px; font-weight: 600; color: #1F4E79; }
+  .portal-meta { font-size: 12px; color: #999; margin-top: 2px; }
+  .access-badge { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 20px; background: #E1F5EE; color: #0F6E56; border: 1px solid #9FE1CB; margin-left: 6px; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  @media (max-width: 500px) { .kpi-grid { grid-template-columns: repeat(2,1fr); } }
+  .kpi-card { background: #f5f5f3; border-radius: 8px; padding: 10px 12px; }
+  .kpi-val { font-size: 18px; font-weight: 600; color: #111; }
+  .kpi-lbl { font-size: 11px; color: #888; margin-top: 2px; }
+  .kpi-delta { font-size: 11px; margin-top: 2px; }
+  .delta-up { color: #1D9E75; } .delta-down { color: #E24B4A; }
+
+  .milestone-list { list-style: none; padding: 0; }
+  .milestone-list li { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f0f0ee; font-size: 13px; }
+  .milestone-list li:last-child { border-bottom: none; }
+  .ms-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 3px; flex-shrink: 0; }
+  .ms-done { background: #1D9E75; } .ms-active { background: #378ADD; } .ms-next { background: #ddd; }
+  .ms-text { flex: 1; color: #333; }
+  .ms-date { font-size: 11px; color: #aaa; white-space: nowrap; }
+
+  .doc-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0ee; font-size: 13px; }
+  .doc-row:last-child { border-bottom: none; }
+  .doc-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+  .badge-public { background: #E1F5EE; color: #0F6E56; }
+  .badge-investor { background: #E6F1FB; color: #185FA5; }
+  .badge-shareholder { background: #EEEDFE; color: #534AB7; }
+
+  .update-item { padding: 9px 0; border-bottom: 1px solid #f0f0ee; }
+  .update-item:last-child { border-bottom: none; }
+  .update-title { font-size: 13px; font-weight: 500; color: #111; margin-bottom: 2px; }
+  .update-meta { font-size: 11px; color: #aaa; }
+
+  .portal-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 580px) { .portal-two-col { grid-template-columns: 1fr; } }
+
+  .info-box { background: #FAEEDA; border-left: 3px solid #BA7517; border-radius: 0; padding: 10px 12px; font-size: 12px; color: #7a4a0a; margin-bottom: 1rem; }
+
+  footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid #ddd; font-size: 11px; color: #bbb; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>KI-gestütztes IR-Framework für Schweizer Startups</h1>
+    <p>Transferthesis Christoph Ottiger – Baukasten zur strukturierten Mittelbeschaffung bei Privatinvestoren (CHF 10 000–100 000)</p>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('framework',this)">Framework</div>
+    <div class="tab" onclick="showTab('dashboard',this)">Dashboard Gründer</div>
+    <div class="tab" onclick="showTab('portal',this)">Investor-Portal</div>
+    <div class="tab" onclick="showTab('matrix',this)">Auto vs. Dialog</div>
+  </div>
+
+  <!-- FRAMEWORK -->
+  <div id="sec-framework" class="section visible">
+    <div class="phase-grid">
+      <div class="phase-btn p1 active" id="pb1" onclick="showPhase(1,this)">
+        <div class="pnum">Phase 1</div>
+        <div class="ptitle">Positionierung & Datenraum</div>
+        <div class="psub">Narrativ · Master-Doc</div>
+      </div>
+      <div class="phase-btn p2" id="pb2" onclick="showPhase(2,this)">
+        <div class="pnum">Phase 2</div>
+        <div class="ptitle">Identifikation & Qualifizierung</div>
+        <div class="psub">Research · Scoring</div>
+      </div>
+      <div class="phase-btn p3" id="pb3" onclick="showPhase(3,this)">
+        <div class="pnum">Phase 3</div>
+        <div class="ptitle">Ansprache & Mittelbeschaffung</div>
+        <div class="psub">Kanäle · Outreach</div>
+      </div>
+      <div class="phase-btn p4" id="pb4" onclick="showPhase(4,this)">
+        <div class="pnum">Phase 4</div>
+        <div class="ptitle">Pflege & Kommunikation</div>
+        <div class="psub">Updates · Portal · GV</div>
+      </div>
+    </div>
+
+    <!-- Phase 1 -->
+    <div class="detail visible" id="dp1">
+      <div class="detail-header">
+        <span class="badge" style="background:#E1F5EE;color:#085041">Phase 1</span>
+        <span class="detail-title">Positionierung & Datenraum</span>
+      </div>
+      <div class="row-grid">
+        <div class="row-card">
+          <div class="rlabel">Prozess</div>
+          <ul>
+            <li>Strategie & Kernaussagen definieren – Voraussetzung für alles</li>
+            <li>Master-Narrativ-Dokument erstellen (Single Source of Truth)</li>
+            <li>Datenraum strukturieren: Zugriffsrechte, Versionen, Qualität</li>
+            <li>Alle Materialien aus Master ableiten: One-Pager, Deck, Summary</li>
+          </ul>
+        </div>
+        <div class="row-card">
+          <div class="rlabel">Tools</div>
+          <span class="tag">Notion (Master-Dok.)</span>
+          <span class="tag">Docsend (Datenraum + Analytics)</span>
+          <span class="tag">Google Drive (Versionen)</span>
+        </div>
+        <div class="row-card">
+          <div class="rlabel">KI-Einsatz (Claude)</div>
+          <ul>
+            <li>Narrativ-Konsistenzprüfung zwischen Dokumenten</li>
+            <li>Lückenanalyse: fehlende Argumente identifizieren</li>
+            <li>Drafts: Executive Summary, FAQ, Investorenpräsentation</li>
+          </ul>
+        </div>
+      </div>
+      <div class="stop-box">⚠ Stopp-Punkt: Wenn die Strategie unklar ist, hilft KI nicht. Erst Strategie klären – dann KI einsetzen.</div>
+      <div class="output-row">
+        <span class="output-lbl">Output:</span>
+        <span class="obadge" style="background:#E1F5EE;color:#085041">Datenraum</span>
+        <span class="obadge" style="background:#E1F5EE;color:#085041">Master-Narrativ</span>
+        <span class="obadge" style="background:#E1F5EE;color:#085041">One-Pager</span>
+      </div>
+    </div>
+
+    <!-- Phase 2 -->
+    <div class="detail" id="dp2">
+      <div class="detail-header">
+        <span class="badge" style="background:#E6F1FB;color:#0C447C">Phase 2</span>
+        <span class="detail-title">Investoren-Identifikation & Qualifizierung</span>
+      </div>
+      <div class="row-grid">
+        <div class="row-card">
+          <div class="rlabel">Prozess</div>
+          <ul>
+            <li>Idealprofil: Ticket-Grösse, Branche, Geografie, Risikotoleranz</li>
+            <li>Quellen: Investiere.ch, SECA, Swiss Startup Radar, LinkedIn, Family Offices</li>
+            <li>Shortlist-Kriterien vor der Ansprache festlegen</li>
+            <li>Themenspezifische Suchlogik für Nischen-Zielpublikum</li>
+          </ul>
+        </div>
+        <div class="row-card">
+          <div class="rlabel">Tools</div>
+          <span class="tag">Clay / Apollo (Research)</span>
+          <span class="tag">LinkedIn Sales Navigator</span>
+          <span class="tag">HubSpot / Notion CRM</span>
+          <span class="tag">Investiere.ch</span>
+          <span class="tag">SECA</span>
+        </div>
+        <div class="row-card">
+          <div class="rlabel">KI-Einsatz (Claude)</div>
+          <ul>
+            <li>Profil-Matching: Investor vs. Startup-Kriterien</li>
+            <li>Netzwerkanalyse: Warm-Introduction-Potenzial identifizieren</li>
+            <li>Automatisches Scoring & Priorisierung der Longlist</li>
+          </ul>
+        </div>
+      </div>
+      <div class="stop-box">⚠ Stopp-Punkt: KI-Massen-Outreach zerstört Vertrauen bei Privatinvestoren. KI nur für Research und Priorisierung – nie für die Erstkommunikation.</div>
+      <div class="output-row">
+        <span class="output-lbl">Output:</span>
+        <span class="obadge" style="background:#E6F1FB;color:#0C447C">Qualifizierte Shortlist</span>
+        <span class="obadge" style="background:#E6F1FB;color:#0C447C">Scoring-Matrix</span>
+      </div>
+    </div>
+
+    <!-- Phase 3 -->
+    <div class="detail" id="dp3">
+      <div class="detail-header">
+        <span class="badge" style="background:#FAEEDA;color:#633806">Phase 3</span>
+        <span class="detail-title">Ansprache & Mittelbeschaffung</span>
+      </div>
+      <div class="row-grid">
+        <div class="row-card">
+          <div class="rlabel">Prozess</div>
+          <ul>
+            <li>Direktkanäle: Warm Introduction, Events, Pitchabende, Alumni</li>
+            <li>Plattformkanäle: Investiere.ch, Wemakeit, Startup Associations</li>
+            <li>Intermediäre: Family-Office-Scouts, Anwälte, Treuhänder</li>
+            <li>Pro Kanal eigene Kommunikationsvorlage – keine Einheitsnachricht</li>
+          </ul>
+        </div>
+        <div class="row-card">
+          <div class="rlabel">Tools</div>
+          <span class="tag">HubSpot CRM (Pipeline)</span>
+          <span class="tag">Docsend (Deck-Analytics)</span>
+          <span class="tag">Calendly (Scheduling)</span>
+        </div>
+        <div class="row-card">
+          <div class="rlabel">KI-Einsatz (Claude)</div>
+          <ul>
+            <li>Personalisierte Erstmail-Drafts je Profil & Kanal</li>
+            <li>Q&A-Vorbereitung: häufige Investorfragen antizipieren</li>
+            <li>Follow-up-Logik basierend auf Docsend-Analytics</li>
+          </ul>
+        </div>
+      </div>
+      <div class="output-row">
+        <span class="output-lbl">Output:</span>
+        <span class="obadge" style="background:#FAEEDA;color:#633806">Aktive Pipeline</span>
+        <span class="obadge" style="background:#FAEEDA;color:#633806">Laufende Gespräche</span>
+      </div>
+    </div>
+
+    <!-- Phase 4 -->
+    <div class="detail" id="dp4">
+      <div class="detail-header">
+        <span class="badge" style="background:#EEEDFE;color:#3C3489">Phase 4</span>
+        <span class="detail-title">Pflege, Kommunikation & Formalisierung</span>
+      </div>
+      <div class="row-grid">
+        <div class="row-card">
+          <div class="rlabel">Prozess</div>
+          <ul>
+            <li>Kommunikationskalender: Updates, GV, Events, Quartalsberichte</li>
+            <li>Sales-Briefing: einheitliches Narrativ für alle Vertriebspersonen</li>
+            <li>Entscheidungsmatrix: persönlicher Dialog vs. Automatisierung</li>
+            <li>GV-Formate mit Vorlagen (ordentlich & ausserordentlich)</li>
+            <li>Investor-Portal: zugangsbeschränkte Informationsebene</li>
+          </ul>
+        </div>
+        <div class="row-card">
+          <div class="rlabel">Tools</div>
+          <span class="tag">Notion (Investor-Portal)</span>
+          <span class="tag">Mailchimp / HubSpot</span>
+          <span class="tag">Luma / Eventbrite (GV)</span>
+          <span class="tag">Notion (Sales Knowledge Base)</span>
+        </div>
+        <div class="row-card">
+          <div class="rlabel">KI-Einsatz (Claude)</div>
+          <ul>
+            <li>Quartals-Update-Drafts auf Basis von KPI-Datenpunkten</li>
+            <li>Narrativ-Konsistenzprüfung für Sales-Materialien</li>
+            <li>GV-Vorbereitung: Traktanden, Protokollvorlagen, FAQ</li>
+            <li>Sentiment-Analyse aus Investoren-Feedback</li>
+          </ul>
+        </div>
+      </div>
+      <div class="output-row">
+        <span class="output-lbl">Output:</span>
+        <span class="obadge" style="background:#EEEDFE;color:#3C3489">Investor-Portal</span>
+        <span class="obadge" style="background:#EEEDFE;color:#3C3489">Vertrauen & Bindung</span>
+        <span class="obadge" style="background:#EEEDFE;color:#3C3489">GV-Unterlagen</span>
+      </div>
+    </div>
+
+    <div class="sec-div">Gemeinsame Infrastruktur – alle Phasen</div>
+    <div class="infra-grid">
+      <div class="infra-card">
+        <div class="ic-title">Notion – Single Source of Truth</div>
+        <div class="ic-sub">Master-Narrativ, Investor-Portal, Sales Knowledge Base. Alle Phasen greifen auf denselben Inhaltsstand zu. Synced Blocks verhindern Inkonsistenzen.</div>
+      </div>
+      <div class="infra-card">
+        <div class="ic-title">HubSpot CRM – Pipeline-Tracking (Phase 2–4)</div>
+        <div class="ic-sub">Investoren-Status, Gesprächshistorie, Follow-up-Logik. Kostenlose Version für Frühphasen-Startups ausreichend. Optional: Notion als leichtgewichtiges CRM.</div>
+      </div>
+    </div>
+    <p style="font-size:11px;color:#bbb;margin-top:8px;">Tool-Auswahl ist vorläufig – wird nach den Interviews angepasst.</p>
+  </div>
+
+  <!-- DASHBOARD GRÜNDER -->
+  <div id="sec-dashboard" class="section">
+    <div class="card">
+      <div class="card-label">Fundraising-Übersicht</div>
+      <div class="metrics">
+        <div class="metric"><span class="val" style="color:#1D9E75">CHF 380k</span><div class="lbl">Zugesagt</div></div>
+        <div class="metric"><span class="val" style="color:#378ADD">12</span><div class="lbl">Aktive Gespräche</div></div>
+        <div class="metric"><span class="val" style="color:#BA7517">CHF 120k</span><div class="lbl">In Verhandlung</div></div>
+        <div class="metric"><span class="val" style="color:#534AB7">76%</span><div class="lbl">Ziel erreicht</div></div>
+      </div>
+      <div class="card-label">Investor-Pipeline</div>
+      <div class="pipeline">
+        <div class="pipe-step"><div class="pn" style="color:#0F6E56">34</div><div class="pl">Identifiziert</div></div>
+        <div class="pipe-step"><div class="pn">18</div><div class="pl">Kontaktiert</div></div>
+        <div class="pipe-step"><div class="pn" style="color:#378ADD">12</div><div class="pl">Im Gespräch</div></div>
+        <div class="pipe-step"><div class="pn" style="color:#BA7517">5</div><div class="pl">Zugesagt</div></div>
+        <div class="pipe-step"><div class="pn" style="color:#0F6E56">3</div><div class="pl">Abgeschlossen</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Kommunikations-Status</div>
+      <div class="metrics">
+        <div class="metric"><span class="val">14 Tage</span><div class="lbl">Letztes Update</div></div>
+        <div class="metric"><span class="val" style="color:#BA7517">3</span><div class="lbl">Investoren &gt;60 Tage ohne Kontakt</div></div>
+        <div class="metric"><span class="val">68%</span><div class="lbl">Öffnungsrate letztes Update</div></div>
+        <div class="metric"><span class="val" style="color:#534AB7">GV</span><div class="lbl">Nächstes Format: 12. Sept.</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Datenraum-Analytics (Docsend)</div>
+      <div class="metrics">
+        <div class="metric"><span class="val">8</span><div class="lbl">Aktive Leser</div></div>
+        <div class="metric"><span class="val" style="color:#E24B4A">Slide 7</span><div class="lbl">Schwächste Seite</div></div>
+        <div class="metric"><span class="val">4:32</span><div class="lbl">Ø Lesezeit Pitch-Deck</div></div>
+        <div class="metric"><span class="val" style="color:#1D9E75">Slide 3</span><div class="lbl">Meiste Zeit</div></div>
+      </div>
+    </div>
+    <p style="font-size:11px;color:#bbb;">Tool-Optionen: Einfach → Notion-Dashboard | Mittel → HubSpot + Docsend + Mailchimp | Fortgeschritten → Make.com / Zapier</p>
+  </div>
+
+  <!-- INVESTOR-PORTAL -->
+  <div id="sec-portal" class="section">
+    <div class="info-box">Das Investor-Portal zeigt nur freigegebene Inhalte – zugänglich per geschütztem Link (z.B. Notion, Docsend). Investoren sind jederzeit informiert, ohne dass der Gründer laufend Updates ausspielen muss.</div>
+    <div class="portal-header">
+      <div>
+        <div class="portal-logo">acme.startup.ch – Investor-Portal</div>
+        <div class="portal-meta">Letzte Aktualisierung: 10. Juni 2026 <span class="access-badge">✓ Bestätigter Investor</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Aktuelle Kennzahlen (Q1 2026)</div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-val">CHF 148k</div><div class="kpi-lbl">ARR (Jahresumsatz)</div><div class="kpi-delta delta-up">↑ +34% vs. Vorquartal</div></div>
+        <div class="kpi-card"><div class="kpi-val">23</div><div class="kpi-lbl">Aktive Kunden</div><div class="kpi-delta delta-up">↑ +5 neue Kunden</div></div>
+        <div class="kpi-card"><div class="kpi-val">CHF 500k</div><div class="kpi-lbl">Fundraising-Ziel Runde A</div><div class="kpi-delta" style="color:#378ADD">76% erreicht (CHF 380k)</div></div>
+        <div class="kpi-card"><div class="kpi-val">8.2</div><div class="kpi-lbl">NPS (Kundenzufriedenheit)</div><div class="kpi-delta delta-up">↑ +0.4 vs. Vorquartal</div></div>
+        <div class="kpi-card"><div class="kpi-val">14 Mo.</div><div class="kpi-lbl">Runway (bei aktuellem Burn)</div><div class="kpi-delta" style="color:#888">Stabil</div></div>
+        <div class="kpi-card"><div class="kpi-val">4</div><div class="kpi-lbl">Teammitglieder (FTE)</div><div class="kpi-delta delta-up">↑ +1 seit letztem Update</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Meilensteine & Roadmap</div>
+      <ul class="milestone-list">
+        <li><div class="ms-dot ms-done"></div><div class="ms-text">Produktlaunch v1.0 – erstes zahlungspflichtiges Kundensegment</div><div class="ms-date">März 2026 ✓</div></li>
+        <li><div class="ms-dot ms-done"></div><div class="ms-text">Seed-Runde abgeschlossen (CHF 250k)</div><div class="ms-date">Jan. 2026 ✓</div></li>
+        <li><div class="ms-dot ms-active"></div><div class="ms-text">Series A Fundraising – Ziel CHF 500k, aktuell CHF 380k zugesagt</div><div class="ms-date">laufend</div></li>
+        <li><div class="ms-dot ms-active"></div><div class="ms-text">Expansion Deutschschweiz – 3 neue Enterprise-Kunden in Pipeline</div><div class="ms-date">Q2–Q3 2026</div></li>
+        <li><div class="ms-dot ms-next"></div><div class="ms-text">Produktlaunch v2.0 – KI-gestützte Automatisierungsfunktionen</div><div class="ms-date">Q4 2026 geplant</div></li>
+        <li><div class="ms-dot ms-next"></div><div class="ms-text">Markteintritt Österreich & Deutschland</div><div class="ms-date">2027 geplant</div></li>
+      </ul>
+      <div style="display:flex;gap:16px;font-size:11px;color:#888;margin-top:10px;">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#1D9E75;margin-right:4px;"></span>Erreicht</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#378ADD;margin-right:4px;"></span>In Arbeit</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ddd;margin-right:4px;"></span>Geplant</span>
+      </div>
+    </div>
+    <div class="portal-two-col">
+      <div class="card">
+        <div class="card-label">Investor-Updates (Archiv)</div>
+        <div class="update-item"><div class="update-title">Q1 2026 Update – Starkes Wachstum, Series A läuft</div><div class="update-meta">10. April 2026 · PDF verfügbar</div></div>
+        <div class="update-item"><div class="update-title">Q4 2025 Update – Produktlaunch & erste Kunden</div><div class="update-meta">15. Jan. 2026 · PDF verfügbar</div></div>
+        <div class="update-item"><div class="update-title">Meilenstein-Update: Seed-Runde abgeschlossen</div><div class="update-meta">20. Jan. 2026 · Kurzinfo</div></div>
+        <div class="update-item"><div class="update-title">Q3 2025 Update – Pilotphase & erstes Feedback</div><div class="update-meta">8. Okt. 2025 · PDF verfügbar</div></div>
+      </div>
+      <div class="card">
+        <div class="card-label">Dokumente & Unterlagen</div>
+        <div class="doc-row"><span>One-Pager (aktuell)</span><div style="display:flex;align-items:center;gap:8px;"><span class="doc-badge badge-public">Öffentlich</span><span style="font-size:11px;color:#aaa;">Juni 2026</span></div></div>
+        <div class="doc-row"><span>Pitch Deck Series A</span><div style="display:flex;align-items:center;gap:8px;"><span class="doc-badge badge-investor">Investor</span><span style="font-size:11px;color:#aaa;">Mai 2026</span></div></div>
+        <div class="doc-row"><span>Finanzplan 2026–2028</span><div style="display:flex;align-items:center;gap:8px;"><span class="doc-badge badge-investor">Investor</span><span style="font-size:11px;color:#aaa;">Apr. 2026</span></div></div>
+        <div class="doc-row"><span>GV-Protokoll 2025</span><div style="display:flex;align-items:center;gap:8px;"><span class="doc-badge badge-shareholder">Aktionäre</span><span style="font-size:11px;color:#aaa;">Dez. 2025</span></div></div>
+        <div class="doc-row"><span>Jahresbericht 2025</span><div style="display:flex;align-items:center;gap:8px;"><span class="doc-badge badge-shareholder">Aktionäre</span><span style="font-size:11px;color:#aaa;">Feb. 2026</span></div></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:12px;">
+      <div class="card-label">Nächste Termine & Events</div>
+      <div class="metrics" style="grid-template-columns:repeat(3,1fr);">
+        <div class="metric"><span class="val" style="font-size:15px;color:#534AB7">12. Sept. 2026</span><div class="lbl">Ordentliche Generalversammlung · Zürich</div></div>
+        <div class="metric"><span class="val" style="font-size:15px;color:#378ADD">Aug. 2026</span><div class="lbl">Investor-Informationsanlass · Q2-Update</div></div>
+        <div class="metric"><span class="val" style="font-size:15px;color:#1D9E75">Okt. 2026</span><div class="lbl">Q3 Investor-Update (schriftlich)</div></div>
+      </div>
+    </div>
+    <p style="font-size:11px;color:#bbb;margin-top:8px;">Umsetzung: Notion (geschützte Seiten) · Docsend (Dokumente mit Zugriffsprotokoll) · keine Eigenentwicklung erforderlich</p>
+  </div>
+
+  <!-- MATRIX -->
+  <div id="sec-matrix" class="section">
+    <div class="card">
+      <div class="card-label">Entscheidungsmatrix: Persönlicher Dialog vs. Automatisierung</div>
+      <table class="matrix-table">
+        <tr><th>Situation</th><th>Format</th><th>Empfehlung</th></tr>
+        <tr><td>Erstvertrauen aufbauen, neuer Investor</td><td>Persönliches Gespräch</td><td><span class="dot dot-p"></span>Nie automatisieren</td></tr>
+        <tr><td>Warm Introduction vorbereiten</td><td>Persönliche Nachricht</td><td><span class="dot dot-p"></span>Nie automatisieren</td></tr>
+        <tr><td>Krisenkommunikation</td><td>Telefon / persönlich</td><td><span class="dot dot-p"></span>Nie automatisieren</td></tr>
+        <tr><td>Q&A nach Pitch / Due Diligence</td><td>Call + Dokument</td><td><span class="dot dot-p"></span>Persönlich, KI-unterstützt</td></tr>
+        <tr><td>Quarterly Update an alle Investoren</td><td>E-Mail-Template</td><td><span class="dot dot-h"></span>Automatisiert, persönlich eröffnen</td></tr>
+        <tr><td>Meilenstein erreicht</td><td>E-Mail + optionaler Call</td><td><span class="dot dot-h"></span>Hybrides Format</td></tr>
+        <tr><td>Sales-Briefing (Vertrieb informieren)</td><td>Internes Dokument + Meeting</td><td><span class="dot dot-h"></span>Prozessgestützt, KI-gepflegt</td></tr>
+        <tr><td>GV-Einladung (ordentlich)</td><td>Formeller Brief / E-Mail</td><td><span class="dot dot-a"></span>Automatisierbar</td></tr>
+        <tr><td>Informationsevent / Update-Anlass</td><td>Event-Plattform + E-Mail</td><td><span class="dot dot-a"></span>Automatisierbar</td></tr>
+        <tr><td>Quartals-/Halbjahresbericht Versand</td><td>E-Mail + PDF</td><td><span class="dot dot-a"></span>Automatisierbar</td></tr>
+        <tr><td>Zeichnungsbestätigung</td><td>Formeller Brief / E-Mail</td><td><span class="dot dot-a"></span>Vollständig automatisierbar</td></tr>
+      </table>
+      <div class="legend">
+        <div class="legend-item"><span class="dot dot-p"></span>Persönlicher Dialog (nie automatisieren)</div>
+        <div class="legend-item"><span class="dot dot-h"></span>Hybrides Format</div>
+        <div class="legend-item"><span class="dot dot-a"></span>Automatisierbar</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Christoph Ottiger | Transferthesis CAS HSG DIBT 11 | KI-gestützte Investor Relations für Schweizer Startups</footer>
+</div>
+
+<script>
+function showPhase(n, el) {
+  [1,2,3,4].forEach(i => {
+    document.getElementById('dp'+i).classList.remove('visible');
+    document.getElementById('pb'+i).classList.remove('active');
+  });
+  document.getElementById('dp'+n).classList.add('visible');
+  el.classList.add('active');
+}
+function showTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  ['framework','dashboard','portal','matrix'].forEach(t => {
+    document.getElementById('sec-'+t).classList.remove('visible');
+  });
+  document.getElementById('sec-'+name).classList.add('visible');
+}
+</script>
+</body>
+</html>
